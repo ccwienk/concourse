@@ -1,0 +1,16 @@
+name: Build
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: gar-auth
+        uses: gardener/cc-utils/.github/actions/gar-auth@master
+      - name: test
+        run: |
+          echo "test"
