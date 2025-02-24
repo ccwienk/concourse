@@ -67,7 +67,7 @@ jobs:
         prerelease: ${{ inputs.version-prerelease }}
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform.runner }}
     permissions:
       id-token: write
     needs:
@@ -75,6 +75,14 @@ jobs:
       - version
     strategy:
       matrix:
+        platform:
+          - name: linux/amd64
+            runner: ubuntu-latest
+            suffix: amd64
+          - name: linux/arm64
+            runner: ubuntu-24.04-arm
+            suffix: arm64
+
         image:
           - name: concourse-worker
             dockerfile: concourse-worker.dockerfile
@@ -144,9 +152,10 @@ jobs:
         with:
           name: ${{ matrix.image.name }}
           repository: ${{ needs.params.outputs.oci_repository}}/${{ matrix.image.name }}
+          extra-tags: ${{ matrix.platform.suffix }}
           version: ${{ needs.version.outputs.version }}
           ocm_labels: ${{ matrix.image.labels }}
-          oci_platforms: ${{ matrix.image.oci_platforms }}
+          oci_platforms: ${{ matrix.platform.name }}
           context: .
           dockerfile: ${{ matrix.image.dockerfile }}
 
