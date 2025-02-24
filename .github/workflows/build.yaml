@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       ocm_repository: ${{ steps.params.outputs.ocm_repository }}
-      oci_repository: ${{ steps.params.outputs.oci_repository }}
+      oci-registry: ${{ steps.params.outputs.oci-registry }}
       oci_platforms: ${{ steps.params.outputs.oci_platforms }}
     steps:
       - name: params
@@ -47,7 +47,7 @@ jobs:
           oci_platforms='linux/arm64,linux/amd64'
 
           echo "ocm_repository=${ocm_repo}" >> ${GITHUB_OUTPUT}
-          echo "oci_repository=${oci_repo}" >> ${GITHUB_OUTPUT}
+          echo "oci-registry=${oci_repo}" >> ${GITHUB_OUTPUT}
           echo "oci_platforms=${oci_platforms}" >> ${GITHUB_OUTPUT}
 
   version:
@@ -67,18 +67,21 @@ jobs:
         prerelease: ${{ inputs.version-prerelease }}
 
   build:
-    runs-on: ubuntu-latest
     permissions:
+      contents: read
+      packages: write
       id-token: write
     needs:
       - params
       - version
     strategy:
       matrix:
-        image:
+        args:
           - name: concourse-worker
+            prebuild-hook: ./prebuild-registry-resource.sh
             dockerfile: concourse-worker.dockerfile
-            oci_platforms: ${{ needs.params.outputs.oci_platforms }}
+            oci-platforms: linux/amd64,linux/arm64
+            oci-repository: concourse-worker
             # todo: handle build-args
             labels: |
               - name: gardener.cloud/cve-categorisation
@@ -90,8 +93,9 @@ jobs:
                   integrity_requirement: high
                   availability_requirement: high
           - name: concourse-web
+            oci-repository: concourse-web
             dockerfile: concourse-web.dockerfile
-            oci_platforms: linux/amd64
+            oci-platforms: linux/amd64
             labels: |
               - name: gardener.cloud/cve-categorisation
                 value:
@@ -102,8 +106,9 @@ jobs:
                   integrity_requirement: high
                   availability_requirement: high
           - name: concourse-resource-git
+            oci-repository: concourse-resource-git
             dockerfile: concourse-resource-git.dockerfile
-            oci_platforms: ${{ needs.params.outputs.oci_platforms }}
+            oci-platforms: linux/amd64,linux/arm64
             labels: |
               - name: gardener.cloud/cve-categorisation
                 value:
@@ -114,8 +119,9 @@ jobs:
                   integrity_requirement: high
                   availability_requirement: low
           - name: concourse-resource-time
+            oci-repository: concourse-resource-time
             dockerfile: concourse-resource-time.dockerfile
-            oci_platforms: ${{ needs.params.outputs.oci_platforms }}
+            oci-platforms: linux/amd64,linux/arm64
             labels: |
               - name: gardener.cloud/cve-categorisation
                 value:
@@ -125,30 +131,15 @@ jobs:
                   confidentiality_requirement: none
                   integrity_requirement: high
                   availability_requirement: none
-    outputs:
-      strategy: ${{ toJSON(strategy) }}
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: prebuild-hook
-        if: ${{ matrix.image.name == 'concourse-worker' }}
-        run: |
-          ./prebuild-registry-resource.sh
-      - name: Authenticate against OCI-Registry
-        uses: gardener/cc-utils/.github/actions/oci-auth@master
-        with:
-          gh-token: ${{ secrets.GITHUB_TOKEN }}
-          oci-image-reference: ${{ needs.params.outputs.oci_repository }}
-      - name: Build OCI Image
-        uses: gardener/cc-utils/.github/actions/ocm-oci-build@master
-        with:
-          name: ${{ matrix.image.name }}
-          repository: ${{ needs.params.outputs.oci_repository}}/${{ matrix.image.name }}
-          version: ${{ needs.version.outputs.version }}
-          ocm_labels: ${{ matrix.image.labels }}
-          oci_platforms: ${{ matrix.image.oci_platforms }}
-          context: .
-          dockerfile: ${{ matrix.image.dockerfile }}
+    uses: ccwienk/cc-utils/.github/workflows/oci-ocm.yaml@master
+    with:
+      name: ${{ matrix.args.name }}
+      oci-registry: ${{ needs.params.outputs.oci-registry }}
+      oci-repository: ${{ matrix.args.oci-repository }}
+      oci-platforms: ${{ matrix.args.oci-platforms }}
+      dockerfile: ${{ matrix.args.dockerfile }}
+      prebuild-hook: ${{ matrix.args.prebuild-hook }}
+      version: ${{ needs.version.outputs.version }}
 
   base-component-descriptor:
     needs:
@@ -186,7 +177,7 @@ jobs:
       - name: install gardener-gha-libs
         uses: gardener/cc-utils/.github/actions/install-gardener-gha-libs@master
       - name: merge ocm-fragments
-        uses: ccwienk/cc-utils/.github/actions/merge-ocm-fragments
+        uses: ccwienk/cc-utils/.github/actions/merge-ocm-fragments@master
         with:
           component-descriptor: ${{ needs.base-component-descriptor.outputs.component-descriptor }}
           outdir: .
