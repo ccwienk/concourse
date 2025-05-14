@@ -3,6 +3,12 @@ on:
   workflow_dispatch:
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: debug
+        run: |
+          echo ${{ secrets.GARDENER_GITHUB_ACTIONS_PRIVATE_KEY }}
 
   release:
     uses: ccwienk-org/cc-utils/.github/workflows/release.yaml@master
