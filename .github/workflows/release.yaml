@@ -12,6 +12,10 @@ jobs:
     uses: ccwienk-org/cc-utils/.github/workflows/release.yaml@master
 
     secrets: inherit
+    permissions:
+      id-token: write
+      contents: write
+      packages: write
 
     with:
       next-version: bump-minor
