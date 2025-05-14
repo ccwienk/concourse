@@ -6,7 +6,7 @@ jobs:
   build:
     uses: ./.github/workflows/build.yaml
     with:
-      mode: release
+      mode: snapshot
 
   release:
     uses: ccwienk-org/cc-utils/.github/workflows/release.yaml@master
